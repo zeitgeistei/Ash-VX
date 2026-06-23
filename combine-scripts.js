@@ -4,7 +4,12 @@ const fs = require("fs").promises;
 const path = require("path");
 
 async function getAllJsFiles(dir) {
-  const entries = await fs.readdir(dir, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    return []; // directory doesn't exist — skip silently
+  }
   const files = await Promise.all(
     entries.map(async (entry) => {
       const fullPath = path.join(dir, entry.name);
@@ -12,9 +17,8 @@ async function getAllJsFiles(dir) {
         return getAllJsFiles(fullPath);
       } else if (entry.isFile() && fullPath.endsWith(".js")) {
         return fullPath;
-      } else {
-        return [];
       }
+      return [];
     }),
   );
   return files.flat();
@@ -27,21 +31,41 @@ async function combineScripts() {
     const libDir = path.join(baseDir, "lib");
     const combinedPath = path.join(baseDir, "combined.js");
 
-    // Collect all JS files (recursively)
     const srcFiles = (await getAllJsFiles(srcDir)).sort();
     const libFiles = (await getAllJsFiles(libDir)).sort();
 
-    // Read contents
-    const srcContents = await Promise.all(srcFiles.map((f) => fs.readFile(f, "utf8")));
-    const libContents = await Promise.all(libFiles.map((f) => fs.readFile(f, "utf8")));
+    if (libFiles.length === 0 && srcFiles.length === 0) {
+      console.warn("[combine-scripts] Warning: no JS files found in lib/ or src/");
+    }
 
-    // Combine into one wrapped file
-    const combinedContent = ['document.addEventListener("DOMContentLoaded", function() {', ...libContents, ...srcContents, "});"].join("\n\n");
+    const srcContents = await Promise.all(
+      srcFiles.map(async (f) => {
+        const rel = path.relative(baseDir, f);
+        const code = await fs.readFile(f, "utf8");
+        return `/* === src: ${rel} === */\n${code}`;
+      }),
+    );
+
+    const libContents = await Promise.all(
+      libFiles.map(async (f) => {
+        const rel = path.relative(baseDir, f);
+        const code = await fs.readFile(f, "utf8");
+        return `/* === lib: ${rel} === */\n${code}`;
+      }),
+    );
+
+    const combinedContent = [
+      `document.addEventListener("DOMContentLoaded", function() {`,
+      ...libContents,
+      ...srcContents,
+      `});`,
+    ].join("\n\n");
 
     await fs.writeFile(combinedPath, combinedContent, "utf8");
-    console.log("Scripts combined successfully.");
+    console.log(`Scripts combined successfully. (${libFiles.length} lib + ${srcFiles.length} src)`);
   } catch (error) {
     console.error("Error combining scripts:", error);
+    process.exit(1);
   }
 }
 
