@@ -1,4 +1,7 @@
 {
     "name": "MyCoolAshProject",
-    "platform": "phone"
+    "platform": "phone",
+    "version": "1.0.0",
+    "author": "",
+    "description": ""
 }
