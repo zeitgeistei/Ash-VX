@@ -1,6 +1,6 @@
-# Ash
+# Ash VX
 
-Welcome to Ash, my code framework doohicky, powered by Node.js and browser js.
+Welcome to the clearly choice (no shame on m0cha but I added some comfort features long overdue).
 
 ## Getting Started
 
